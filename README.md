@@ -35,7 +35,7 @@ Open http://localhost:3000. Without a Supabase URL/key the app runs a clearly la
 
 ## Connect Supabase securely
 
-1. Use a dedicated project for this office. Apply **all five** migrations in order: `001_inventory.sql`, `002_invitation_access.sql`, `003_item_management.sql`, `004_transactions.sql`, and `005_inventory_snapshot.sql`, or run `supabase db push` against a linked project. For an existing installation, apply only migrations not yet recorded in its migration history. Do not reapply the original migration or reset a populated database.
+1. Use a dedicated project for this office. Apply **all six** migrations in order: `001_inventory.sql`, `002_invitation_access.sql`, `003_item_management.sql`, `004_transactions.sql`, `005_inventory_snapshot.sql`, and `006_dashboard_alerts.sql`, or run `supabase db push` against a linked project. For an existing installation, apply only migrations not yet recorded in its migration history. Do not reapply the original migration or reset a populated database.
 2. In Supabase Authentication, **disable Allow new users to sign up** and anonymous sign-ins. Keep email confirmation enabled. The checked-in `supabase/config.toml` uses these settings for CLI/local Auth; verify them explicitly in the hosted project's dashboard. They are not automatically applied by deploying the UI or Edge Function.
 3. Set a minimum password length of 12 in Auth settings, and configure production SMTP. Use short Auth email-link expiry (for example 1 hour); the separate database invitation expires after 7 days and is also revocable. Supabase applies rate limits to recovery emails; the invitation RPC limits each admin to 20 attempts/hour.
 4. Set the Auth Site URL to the app's exact origin and allow these exact redirects:
@@ -90,6 +90,7 @@ npm run typecheck
 npm run test:access
 npm run test:database
 npm run test:inventory
+npm run test:dashboard
 npm run test:realtime
 npm run build
 ```
@@ -165,3 +166,13 @@ STOCKROOM_TEST_ALLOW_WRITES=disposable-project
 ```
 
 Then run `npm run verify:live`. It creates separate authenticated clients, verifies all stock transaction types and coherent quantities/activity across both, races two withdrawals against the final unit, disconnects one subscription while the other posts, reconnects and fetches missed data, and checks subscription cleanup. It archives its test item afterward; immutable test ledger records and any test locations remain in that disposable project. It never uses a service-role key and does not print passwords/tokens. The disconnection test removes/recreates the real client's subscription and tests the controller's offline gate; separately test browser Network Offline and throttling in two browser profiles/tabs to verify the rendered UI, filter/sort retention, status, and disabled buttons.
+
+## Operational dashboard
+
+The dashboard uses the confirmed inventory snapshot. Metrics count active items only: low stock is strictly positive and at or below the minimum; out of stock is zero. Restocking includes both conditions. Estimated value sums each active item's aggregate current quantity times its current unit cost and is displayed in USD. This is an estimate at current costs, not historical purchase valuation. Archived stock remains stored but is excluded from these operational metrics. Quantities of different units are never combined into a total stock number; location and report summaries show item/balance counts instead.
+
+Issue rankings support rolling 7-, 30-, and 90-day periods, rank by issue transaction frequency, and show quantities separately with each item's unit. Reversed issues are excluded. Recent movements retain the complete posted history. Dashboard Receive, Issue, and Transfer actions are available to staff/admins, require confirmed online stock, and open the relevant movement type. Add Item is admin-only; existing database authorization remains enforced.
+
+Migration 006 stores stock alerts in `stock_alerts`, protected by membership RLS. A partial unique index permits at most one unresolved alert per item. Item quantity, minimum, and lifecycle changes synchronize alerts within the same transaction as the stock operation. Remaining below the threshold preserves the alert ID; replenishment above the minimum or archiving resolves it. Transitioning between positive low stock and zero resolves the old condition and opens the corresponding new condition. Resolved alert history is retained. The realtime snapshot includes unresolved alerts with direct item-detail links. The demo derives isolated sample alerts; real persistent alerts require the migration.
+
+Two dashboard tests validate active/zero/low boundaries, value, mixed-unit handling, and period/reversal-aware issue frequency. PostgreSQL tests validate stable unresolved alert identity, replenishment and zero/archive transitions, retained history, snapshot inclusion, and role restrictions. Supabase remains unconfigured in the current checkout; the dashboard cannot show real office records until that setup is completed.

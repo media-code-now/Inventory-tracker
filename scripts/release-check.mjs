@@ -7,7 +7,7 @@ function run(command,args){const result=spawnSync(command,args,{stdio:'inherit',
 run(process.execPath,['scripts/check-public-config.mjs',...(demo?['--demo']:['--production'])]);
 if(demo)console.log('Preparing an explicitly labeled demo release; real database/authentication are not verified.');
 const npm=process.platform==='win32'?'npm.cmd':'npm';
-for(const script of ['typecheck','test:access','test:inventory','test:realtime','test:database'])run(npm,['run',script]);
+for(const script of ['typecheck','test:access','test:inventory','test:dashboard','test:realtime','test:database'])run(npm,['run',script]);
 run(npm,['audit','--omit=dev']);
 run(npm,['run',demo?'build':'build:production']);
 for(const path of ['out/index.html','out/login/index.html','out/inventory/index.html','out/auth/accept-invite/index.html','out/auth/reset-password/index.html']){
