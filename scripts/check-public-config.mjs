@@ -1,12 +1,16 @@
 import nextEnv from '@next/env';
 const {loadEnvConfig}=nextEnv;
-loadEnvConfig(process.cwd());
+const production=process.argv.includes('--production');
+const demo=process.argv.includes('--demo');
+loadEnvConfig(process.cwd(), process.argv.includes('--development'));
 const key=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const url=process.env.NEXT_PUBLIC_SUPABASE_URL;
+if(demo&&(key||url))throw new Error('A demo release must have no Supabase configuration. Remove public Supabase variables for the demo build, or use the production release command.');
+if(production&&(!key||!url))throw new Error('Production deployment requires NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY. Configure Supabase before building a production release.');
 if(Boolean(key)!==Boolean(url))throw new Error('Set both public Supabase URL and publishable key, or leave both unset for isolated demo mode.');
 if(key){
   if(!URL.canParse(url)||new URL(url).protocol!=='https:'){
-    if(!url?.startsWith('http://127.0.0.1:')&&!url?.startsWith('http://localhost:'))throw new Error('Supabase URL must use HTTPS (except local development).');
+    if(production||(!url?.startsWith('http://127.0.0.1:')&&!url?.startsWith('http://localhost:')))throw new Error('Supabase URL must use HTTPS (except local development).');
   }
   if(key.startsWith('sb_secret_'))throw new Error('A privileged Supabase key cannot be used in browser configuration.');
   if(!key.startsWith('sb_publishable_')){

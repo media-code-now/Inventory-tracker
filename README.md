@@ -1,5 +1,7 @@
 # Stockroom — invitation-only office inventory
 
+For release commands, production configuration, private hosting, and rollback, see [DEPLOYMENT.md](DEPLOYMENT.md).
+
 Next.js App Router, TypeScript, Tailwind CSS, and Supabase Auth/PostgreSQL/Realtime. The UI is a static export; privileged Auth operations run separately in a Supabase Edge Function. No signup page, storefront, checkout, or billing.
 
 ## Implemented access model
