@@ -1,7 +1,7 @@
 export type Item = {id:string;name:string;sku:string;category:string;unit:string;quantity:number;minimum:number;cost:number;location_id:string|null;description:string};
 export type Location = {id:string;name:string;description:string};
 export type Member = {id:string;name:string;role:'admin'|'staff'|'viewer';active:boolean};
-export type Movement = {id:string;item_id:string;actor_id:string;kind:'add'|'remove'|'adjust';delta:number;before_quantity:number;after_quantity:number;note:string;created_at:string};
+export type Movement = {id:string;item_id:string;actor_id:string;kind:'add'|'remove'|'adjust'|'transfer';from_location_id?:string|null;to_location_id?:string|null;transfer_quantity?:number|null;source_before?:number|null;source_after?:number|null;target_before?:number|null;target_after?:number|null;delta:number;before_quantity:number;after_quantity:number;note:string;created_at:string};
 export const demoLocations:Location[]=[{id:'l1',name:'Supply room',description:'Floor 1 · Main office supplies'},{id:'l2',name:'IT cabinet',description:'Floor 2 · Equipment & accessories'},{id:'l3',name:'Kitchen',description:'Floor 1 · Breakroom essentials'},{id:'l4',name:'Storage closet',description:'Floor 2 · Cleaning & facilities'}];
 export const demoMembers:Member[]=[{id:'demo',name:'Alex Morgan',role:'admin',active:true},{id:'d2',name:'Jamie Chen',role:'staff',active:true},{id:'d3',name:'Sam Rivera',role:'staff',active:true}];
 export const demoItems:Item[]=[
@@ -18,3 +18,6 @@ export const demoItems:Item[]=[
 ].map(([id,name,sku,category,unit,quantity,minimum,cost,location_id,description])=>({id,name,sku,category,unit,quantity,minimum,cost,location_id,description} as Item));
 export function demoMovements():Movement[]{return [{id:'m1',item_id:'1',actor_id:'d2',kind:'add',delta:20,before_quantity:28,after_quantity:48,note:'Weekly supply delivery',created_at:new Date(Date.now()-1800000).toISOString()},{id:'m2',item_id:'4',actor_id:'d3',kind:'remove',delta:-2,before_quantity:8,after_quantity:6,note:'Restocked breakroom',created_at:new Date(Date.now()-7200000).toISOString()},{id:'m3',item_id:'3',actor_id:'demo',kind:'add',delta:10,before_quantity:14,after_quantity:24,note:'New equipment delivery',created_at:new Date(Date.now()-10800000).toISOString()},{id:'m4',item_id:'2',actor_id:'d2',kind:'remove',delta:-4,before_quantity:12,after_quantity:8,note:'Distributed to teams',created_at:new Date(Date.now()-86400000).toISOString()}];}
 export function status(i:Item){return i.quantity===0?'Out of stock':i.quantity<=i.minimum?'Low stock':'In stock';}
+
+export type Balance = {item_id:string;location_id:string;quantity:number};
+export type Invitation = {id:string;email:string;name:string;role:Member['role'];user_id:string|null;status:'sending'|'pending'|'accepted'|'revoked'|'failed';expires_at:string;created_at:string};
