@@ -1,0 +1,34 @@
+\set ON_ERROR_STOP on
+update public.members set active=true where id in ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000003');
+select set_config('request.jwt.claims','{"role":"authenticated"}',false);
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);
+set role authenticated;
+do $$ begin
+ if public.office_role() is not null then raise exception 'Direct JWT bypass';end if;
+ if exists(select 1 from public.items) then raise exception 'Inventory leaked';end if;
+ if exists(select 1 from storage.objects) then raise exception 'Storage leaked';end if;
+ begin perform public.office_gate_pre_request();raise exception 'RPC gate bypass';exception when insufficient_privilege then null;end;
+ begin perform public.require_office_role(array['admin']);raise exception 'Mutation bypass';exception when insufficient_privilege then null;end;
+ begin perform public.office_session_create('forged','forged',3600);raise exception 'Session forgery';exception when insufficient_privilege then null;end;
+end $$;
+reset role;
+select public.office_session_create(encode(extensions.digest('test-token','sha256'),'hex'),'generation',3600);
+select set_config('request.headers','{"x-office-session":"test-token","x-office-generation":"generation"}',false);
+set role authenticated;
+select public.office_gate_pre_request();
+do $$ begin if public.office_role()<>'admin' then raise exception 'Admin login broken';end if;if not exists(select 1 from public.items) then raise exception 'Authorized inventory denied';end if;end $$;
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000003',false);
+do $$ begin if public.office_role()<>'viewer' then raise exception 'Identity changed';end if;begin perform public.require_office_role(array['admin']);raise exception 'Viewer escalated';exception when insufficient_privilege then null;end;end $$;
+reset role;
+select set_config('request.headers','{"x-office-session":"test-token","x-office-generation":"rotated"}',false);
+do $$ begin if public.office_gate_valid() then raise exception 'Rotation failed';end if;end $$;
+select public.office_session_delete(encode(extensions.digest('test-token','sha256'),'hex'));
+select set_config('request.headers','{"x-office-session":"test-token","x-office-generation":"generation"}',false);
+do $$ begin if public.office_gate_valid() then raise exception 'Logout failed';end if;end $$;
+select public.office_session_create(encode(extensions.digest('expired','sha256'),'hex'),'generation',60);
+update office_security.sessions set expires_at=now()-interval '1 second';
+select set_config('request.headers','{"x-office-session":"expired","x-office-generation":"generation"}',false);
+do $$ begin if public.office_gate_valid() then raise exception 'Expiration failed';end if;end $$;
+delete from office_security.login_budget;
+do $$ begin for i in 1..20 loop if not public.office_login_attempt() then raise exception 'Budget too small';end if;end loop;if public.office_login_attempt() then raise exception 'Guessing allowed';end if;end $$;
+select 'PASS: direct JWT/API/storage/mutation denial, server-only sessions, identity, viewer permissions, rotation, logout, expiry and shared rate limit' as result;

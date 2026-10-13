@@ -73,9 +73,12 @@ export default function Stockroom({initialPage}:{initialPage:string}){
     return snapshot;
    },
    subscribe:(change,status)=>{
-    const channel=client.channel(`office-stock:${userId}:${page}:${crypto.randomUUID()}`,{config:{postgres_changes_options:{wait:true}}});
-    for(const table of ['items','stock_balances','movements','locations','members','stock_alerts','stock_counts','stock_count_lines','stock_count_entries'])channel.on('postgres_changes',{event:'*',schema:'public',table},change);
-    channel.subscribe(status);return()=>{void client.removeChannel(channel)};
+    // Office sessions are revalidated for every update. No direct Supabase WebSocket.
+    const events=new EventSource('/api/office/events/');
+    events.onopen=()=>status('SUBSCRIBED');
+    events.onmessage=()=>change();
+    events.onerror=()=>status('CHANNEL_ERROR');
+    return()=>events.close();
    },
    apply:snapshot=>{
     if(cancelled||sessionIdRef.current!==userId)return;
@@ -90,7 +93,7 @@ export default function Stockroom({initialPage}:{initialPage:string}){
   const recover=()=>{if(navigator.onLine)void controller.refresh()};window.addEventListener('focus',recover);
   return()=>{cancelled=true;controller.stop();if(liveRef.current===controller)liveRef.current=null;window.removeEventListener('focus',recover)};
  },[userId,demo,page,clearData]);
- async function logout(){if(!supabase)return;liveRef.current?.stop();liveRef.current=null;clearData();setAccess('checking');const {error}=await supabase.auth.signOut({scope:'global'});if(error){await supabase.auth.signOut({scope:'local'});}window.location.assign('/login/');}
+ async function logout(){if(!supabase)return;liveRef.current?.stop();liveRef.current=null;clearData();setAccess('checking');const {error}=await supabase.auth.signOut({scope:'global'});if(error){await supabase.auth.signOut({scope:'local'});}const officeLogout=await fetch('/api/office/logout/',{method:'POST'});if(!officeLogout.ok){setError('Unable to end office session. Use Lock office / log out to retry.');return;}window.location.assign('/office-unlock/');}
  useEffect(()=>{const id=new URLSearchParams(window.location.search).get('id');if(id)setSelected(id)},[]);
  const sidebarRef=useRef<HTMLElement>(null);
  const [compact,setCompact]=useState(false);

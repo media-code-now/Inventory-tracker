@@ -19,7 +19,10 @@
     "test:dashboard": "node --test scripts/test-dashboard.cjs",
     "test:csv": "node --test scripts/test-csv-reports.cjs",
     "verify:office": "node scripts/verify-office.cjs",
-    "test:operations": "node --test scripts/test-diagnostics-focus.cjs"
+    "test:operations": "node --test scripts/test-diagnostics-focus.cjs",
+    "test:office": "node --test scripts/test-office-gate.cjs",
+    "start": "next start",
+    "verify:office-http": "node scripts/verify-office-http.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.0",

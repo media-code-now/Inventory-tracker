@@ -1,3 +1,5 @@
+> **Office access update:** This app now requires a Next.js Node server with HTTPS and migration `010_office_gate.sql`. Previous static `out/` / Sites deployment instructions below are historical and must not be used for the protected app. Follow [OFFICE-ACCESS.md](./OFFICE-ACCESS.md) for environment variables, deployment, password changes, session revocation, and verification.
+
 # Deploy Stockroom
 
 The frontend is a Next.js static export in `out/`; authentication, PostgreSQL, Storage, Realtime, and the invitation backend run in Supabase. Use Node.js 22 (`nvm use`). The existing Sites project stays private. Do not enable public signup or public inventory hosting.

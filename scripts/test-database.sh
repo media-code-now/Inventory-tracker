@@ -40,3 +40,6 @@ psql -h "$TEST_DIR" -p 55439 -d postgres -v ON_ERROR_STOP=1 -f supabase/migratio
 psql -h "$TEST_DIR" -p 55439 -d postgres -v ON_ERROR_STOP=1 -q -f scripts/test-operational-logging.sql
 psql -h "$TEST_DIR" -p 55439 -d postgres -v ON_ERROR_STOP=1 -q -f scripts/operational-check.sql
 sh scripts/test-backup-restore.sh "$TEST_DIR" 55439
+
+psql -h "$TEST_DIR" -p 55439 -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/010_office_gate.sql >/dev/null
+psql -h "$TEST_DIR" -p 55439 -d postgres -v ON_ERROR_STOP=1 -q -f scripts/test-office-gate.sql

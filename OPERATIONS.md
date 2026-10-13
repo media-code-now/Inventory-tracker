@@ -1,3 +1,5 @@
+> **Office access update:** This app now requires a Next.js Node server with HTTPS and migration `010_office_gate.sql`. Previous static `out/` / Sites deployment instructions below are historical and must not be used for the protected app. Follow [OFFICE-ACCESS.md](./OFFICE-ACCESS.md) for environment variables, deployment, password changes, session revocation, and verification.
+
 # Office operations and release gate
 
 **Status: not production-ready.** The private hosted release is an isolated demo. Supabase credentials and test accounts are absent. Local PostgreSQL, permission, concurrency, import and recovery tests are available; they do not verify hosted Auth, SMTP, Storage bytes, WebSockets or the rendered browser experience. No production database has been created, seeded or modified by these tests.

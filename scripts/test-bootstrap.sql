@@ -13,3 +13,7 @@ alter table storage.objects enable row level security;
 grant usage on schema storage to anon,authenticated,service_role;
 grant select,insert,delete on storage.objects to authenticated;
 grant all on storage.buckets,storage.objects to service_role;
+
+create role authenticator;
+create schema extensions;
+create extension pgcrypto with schema extensions;

@@ -25,7 +25,7 @@ Deno.serve(async (request: Request) => {
   if (request.method !== 'POST') return reply(405, {error:'Method not allowed'});
   const authorization = request.headers.get('Authorization');
   if (!authorization?.startsWith('Bearer ')) return reply(401, {error:'Authentication required'});
-  const caller = createClient(url, anonKey, {global:{headers:{Authorization:authorization}},auth:{persistSession:false,autoRefreshToken:false}});
+  const caller = createClient(url, anonKey, {global:{headers:{Authorization:authorization,'x-office-session':request.headers.get('x-office-session')??'','x-office-generation':request.headers.get('x-office-generation')??''}},auth:{persistSession:false,autoRefreshToken:false}});
   // getUser validates the access token with Supabase Auth; JWT contents alone are never trusted.
   const {data:identity,error:authError} = await caller.auth.getUser(authorization.slice(7));
   if (authError || !identity.user) return reply(401, {error:'Invalid session'});

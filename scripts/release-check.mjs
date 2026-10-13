@@ -7,14 +7,12 @@ function run(command,args){const result=spawnSync(command,args,{stdio:'inherit',
 run(process.execPath,['scripts/check-public-config.mjs',...(demo?['--demo']:['--production'])]);
 if(demo)console.log('Preparing an explicitly labeled demo release; real database/authentication are not verified.');
 const npm=process.platform==='win32'?'npm.cmd':'npm';
-for(const script of ['typecheck','test:access','test:inventory','test:dashboard','test:realtime','test:csv','test:operations','test:database'])run(npm,['run',script]);
+for(const script of ['typecheck','test:access','test:office','test:inventory','test:dashboard','test:realtime','test:csv','test:operations','test:database'])run(npm,['run',script]);
 run(npm,['audit','--omit=dev']);
 run(npm,['run',demo?'build':'build:production']);
-for(const path of ['out/index.html','out/login/index.html','out/inventory/index.html','out/reports/index.html','out/imports/index.html','out/auth/accept-invite/index.html','out/auth/reset-password/index.html']){
- if(!existsSync(path))throw new Error('Missing deployment route: '+path);
-}
+if(!existsSync('.next/BUILD_ID')||!existsSync('.next/server/middleware-manifest.json'))throw new Error('Missing server build or office middleware.');
 mkdirSync('release',{recursive:true});
 const archive=demo?'release/stockroom-demo.tar.gz':'release/stockroom-production.tar.gz';
-run('tar',['-czf',archive,'out','.openai/hosting.json']);
-console.log('Release checks passed. Deployment archive: '+archive);
+run('tar',['-czf',archive,'.next','package.json','package-lock.json','next.config.ts']);
+console.log('Release checks passed. Node server deployment archive: '+archive);
 console.log(demo?'This archive is a demo release. Supabase production setup is still required.':'Build configuration is valid. Verify hosted Auth/SMTP/RLS and the two-session live test before office rollout.');
