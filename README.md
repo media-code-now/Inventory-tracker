@@ -33,7 +33,7 @@ Open http://localhost:3000. Without a Supabase URL/key the app runs a clearly la
 
 ## Connect Supabase securely
 
-1. Use a dedicated project for this office. Apply **all four** migrations in order: `001_inventory.sql`, `002_invitation_access.sql`, `003_item_management.sql`, and `004_transactions.sql`, or run `supabase db push` against a linked project. For an existing installation, apply only migrations not yet recorded in its migration history. Do not reapply the original migration or reset a populated database.
+1. Use a dedicated project for this office. Apply **all five** migrations in order: `001_inventory.sql`, `002_invitation_access.sql`, `003_item_management.sql`, `004_transactions.sql`, and `005_inventory_snapshot.sql`, or run `supabase db push` against a linked project. For an existing installation, apply only migrations not yet recorded in its migration history. Do not reapply the original migration or reset a populated database.
 2. In Supabase Authentication, **disable Allow new users to sign up** and anonymous sign-ins. Keep email confirmation enabled. The checked-in `supabase/config.toml` uses these settings for CLI/local Auth; verify them explicitly in the hosted project's dashboard. They are not automatically applied by deploying the UI or Edge Function.
 3. Set a minimum password length of 12 in Auth settings, and configure production SMTP. Use short Auth email-link expiry (for example 1 hour); the separate database invitation expires after 7 days and is also revocable. Supabase applies rate limits to recovery emails; the invitation RPC limits each admin to 20 attempts/hour.
 4. Set the Auth Site URL to the app's exact origin and allow these exact redirects:
@@ -88,6 +88,7 @@ npm run typecheck
 npm run test:access
 npm run test:database
 npm run test:inventory
+npm run test:realtime
 npm run build
 ```
 
@@ -132,3 +133,33 @@ The browser creates a UUID for each posting attempt and keeps the same request/p
 Posted rows cannot be updated or deleted, enforced by grants and a database trigger. An admin can reverse a movement with a required reason. The database derives the inverse from the original row, applies inverse deltas to the current balances (preserving later activity), and appends a row with `reverses_id`. Only one reversal per original is allowed, reversals cannot themselves be reversed, and insufficient stock prevents reversal. Archived items must be restored first. Legacy rows without recorded locations cannot be reversed safely; use a documented admin adjustment. To correct an amount or location, reverse the original and post the intended transaction with a reason referencing the original. No posted record is rewritten.
 
 The database suite also exercises all transaction types, same-key retries and mismatched payloads, exact reversal effects, recipient/notes attribution, retired endpoint denial, immutable ledger rows, and forced ledger failure after stock updates. Two independent PostgreSQL connections test concurrent final-unit issues and concurrent identical retries. These checks use the actual migration and do not send data to production. Apply migration 004 before enabling the updated UI against real Supabase data.
+
+## Realtime inventory and connection recovery
+
+Migration 005 provides `inventory_snapshot()`: one SQL statement returns items, location balances, dashboard inputs, movement activity, locations, members, role-filtered invitations, and a server `confirmed_at` timestamp. It uses SECURITY INVOKER and existing RLS. Anonymous callers cannot execute it; non-members and deactivated members receive no snapshot. Returning everything in one database snapshot prevents mixed totals/location balances/ledger views and avoids the REST API's default 1,000-row table pagination limit.
+
+One realtime controller is owned by each authenticated route/session. It first verifies membership by fetching a snapshot, subscribes to items/balances/movements/locations/members, waits for the server's Postgres Changes readiness acknowledgement (`postgres_changes_options.wait`), and performs a catch-up fetch after every successful join or rejoin. Events only schedule authoritative snapshots; they never overwrite quantities with optimistic math or independently merge rows. Bursts are debounced, fetches serialize, and a dirty event during a fetch schedules another pass. Inventory, item details, totals, and activity update together from the same response.
+
+The header displays connection status and the last successfully confirmed server refresh time. Offline browsers stop their subscription and display a reconnect banner. Transient network failures retain the last confirmed data as read-only with a warning; genuine authentication/membership denial clears office data. Recovery uses online events, focus refresh, periodic checks, and an explicit Reconnect control. Route changes, logout, and unmount remove owned channels/listeners/timers and invalidate late callbacks. Active search, category, location, stock/lifecycle filters, and the selected inventory sort criterion are independent of fetched data and remain selected during updates.
+
+Stock posting requires browser connectivity, an acknowledged realtime subscription, and a successful catch-up snapshot. Every posting also fetches current data immediately before sending its RPC. Receive/issue/return/transfer/adjust/reversal buttons are disabled while disconnected or recovering, and the submit handler checks the controller again. There is no offline queue or automatic replay of stock transactions. A previously in-flight request whose outcome is uncertain retains its idempotency key for a manual retry after reconnect; this is separate from allowing an offline transaction.
+
+### Verification status and two-session test
+
+Local checks passed: five controller tests (two independent simulated sessions, interruption, missed-event recovery, failed/stale fetches, membership denial, callback cleanup, and event coalescing), snapshot RLS/coherence checks against real temporary PostgreSQL, and simultaneous final-unit withdrawal/idempotent retry tests using two independent database connections. The simulated controller tests do not constitute live Supabase Auth/websocket or browser UI verification.
+
+The checkout still has no Supabase project configuration or two provisioned test sessions. An email address alone does not enable that verification. `npm run verify:live` explicitly exits with setup required instead of reporting a pass when credentials are missing.
+
+To run the ready-made real-service verification, configure a **disposable** Supabase project with all migrations, provision an admin and staff member, and supply these values in the ignored `.env.local` or trusted process environment:
+
+```text
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+STOCKROOM_TEST_ADMIN_EMAIL
+STOCKROOM_TEST_ADMIN_PASSWORD
+STOCKROOM_TEST_STAFF_EMAIL
+STOCKROOM_TEST_STAFF_PASSWORD
+STOCKROOM_TEST_ALLOW_WRITES=disposable-project
+```
+
+Then run `npm run verify:live`. It creates separate authenticated clients, verifies all stock transaction types and coherent quantities/activity across both, races two withdrawals against the final unit, disconnects one subscription while the other posts, reconnects and fetches missed data, and checks subscription cleanup. It archives its test item afterward; immutable test ledger records and any test locations remain in that disposable project. It never uses a service-role key and does not print passwords/tokens. The disconnection test removes/recreates the real client's subscription and tests the controller's offline gate; separately test browser Network Offline and throttling in two browser profiles/tabs to verify the rendered UI, filter/sort retention, status, and disabled buttons.
