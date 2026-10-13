@@ -33,7 +33,7 @@ Open http://localhost:3000. Without a Supabase URL/key the app runs a clearly la
 
 ## Connect Supabase securely
 
-1. Use a dedicated project for this office. Apply **both** `supabase/migrations/001_inventory.sql` and `002_invitation_access.sql` in order, or run `supabase db push` against a linked project. For an existing installation, apply only the new migration after verifying migration history. Do not reapply the original migration or reset a populated database.
+1. Use a dedicated project for this office. Apply **all three** migrations in order: `001_inventory.sql`, `002_invitation_access.sql`, and `003_item_management.sql`, or run `supabase db push` against a linked project. For an existing installation, apply only migrations not yet recorded in its migration history. Do not reapply the original migration or reset a populated database.
 2. In Supabase Authentication, **disable Allow new users to sign up** and anonymous sign-ins. Keep email confirmation enabled. The checked-in `supabase/config.toml` uses these settings for CLI/local Auth; verify them explicitly in the hosted project's dashboard. They are not automatically applied by deploying the UI or Edge Function.
 3. Set a minimum password length of 12 in Auth settings, and configure production SMTP. Use short Auth email-link expiry (for example 1 hour); the separate database invitation expires after 7 days and is also revocable. Supabase applies rate limits to recovery emails; the invitation RPC limits each admin to 20 attempts/hour.
 4. Set the Auth Site URL to the app's exact origin and allow these exact redirects:
@@ -87,6 +87,7 @@ If delivery fails, the invitation becomes failed and grants no access. An uncert
 npm run typecheck
 npm run test:access
 npm run test:database
+npm run test:inventory
 npm run build
 ```
 
@@ -103,3 +104,19 @@ One office per Supabase project. Items hold aggregate quantity and a default loc
 Sample fixtures are exclusively in `lib/data.ts`; production remains empty until admins create its records. CSV exports are read-only snapshots and escape spreadsheet formula prefixes.
 
 Implementation follows Supabase's official [RLS](https://supabase.com/docs/guides/database/postgres/row-level-security), [invitation API](https://supabase.com/docs/reference/javascript/auth-admin-inviteuserbyemail), [password recovery](https://supabase.com/docs/guides/auth/passwords), and [Postgres Changes](https://supabase.com/docs/guides/realtime/postgres-changes) documentation.
+
+## Item management and archive lifecycle
+
+The third migration adds optional barcode, supplier, private image path, active/archived status, updated timestamp, and archive timestamp. Existing records remain active. SKU is required and unique case-insensitively; barcodes are optional, unique when present, and preserve leading zeros. Empty optional inputs become NULL. Archived items retain their identifiers, balances, images, and ledger rows, so identifiers cannot be reused. Required category/unit/name/SKU, nonnegative integer thresholds and quantities, and finite nonnegative unit costs are enforced by PostgreSQL constraints.
+
+Admins can create, edit metadata, archive, and restore. The edit RPC has **no quantity, balance, timestamp, or lifecycle parameters**. It only updates a fixed metadata column list and checks the last observed `updated_at` to reject stale edits. Changing the default receiving location does not move stock. Opening quantities must be entered through receive movements per location; later receive/issue/transfer/count changes also use the movement ledger. Database triggers reject stock changes on archived items, with transactional rollback if attempted; restore re-enables operations without resetting balances. There is no item-delete operation.
+
+The inventory table composes search (name, SKU, barcode, supplier, description), category, location, stock status, and lifecycle filters. By default it shows active items. A selected location displays its own quantity/value/status; all-locations mode displays aggregate stock. A location includes an item when it has a balance row (including zero) or is its default location. Unassociated items are not reported as empty at every office location. Low stock means greater than zero and at/below the item minimum; out of stock means zero. Needs restock includes both. The minimum is defined on the item and is used against the selected quantity scope. Reports retain archived stock value; restock alerts consider active items only.
+
+### Private item images
+
+`003_item_management.sql` creates a private `item-images` Storage bucket with a 5 MB limit and JPEG/PNG/WebP MIME allowlist. Uploads require an active admin; reads require active office membership, and non-admins only read images linked to item records. The app downloads images through authenticated Storage requests and renders local blob URLs; it never creates public or reusable signed download URLs. Images use immutable item-specific paths. Upload failures do not create item records. If a metadata save fails, the app attempts cleanup of the unlinked upload; Storage policy prevents deletion if the save actually committed. Replaced images are retained for owner-managed cleanup instead of deleting historical files automatically. The isolated demo keeps image blobs only in browser memory.
+
+Run the third migration before deploying the new app against a populated Supabase project. If existing SKUs differ only in case or contain surrounding whitespace, the migration fails without partial changes: reconcile those identifiers as the trusted owner before retrying. Test the real Storage upload size/MIME limits and authenticated downloads after connecting Supabase; local SQL tests use Storage metadata test doubles and do not emulate object bytes or the Storage HTTP service.
+
+Database tests additionally verify identifier uniqueness across archives, required/numeric constraints, protected quantities, opening ledger entries, separate location quantities, metadata timestamps, stale-edit conflicts, archive/restore/history retention, and image RLS. Four filter tests cover combined search/category/lifecycle filters, per-location quantities, zero balances, and low/out-of-stock distinctions.
