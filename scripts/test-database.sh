@@ -30,3 +30,6 @@ psql -h "$TEST_DIR" -p 55439 -d postgres -v ON_ERROR_STOP=1 -f supabase/migratio
 psql -h "$TEST_DIR" -p 55439 -d postgres -v ON_ERROR_STOP=1 -q -f scripts/test-inventory-snapshot.sql
 psql -h "$TEST_DIR" -p 55439 -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/006_dashboard_alerts.sql >/dev/null
 psql -h "$TEST_DIR" -p 55439 -d postgres -v ON_ERROR_STOP=1 -q -f scripts/test-stock-alerts.sql
+psql -h "$TEST_DIR" -p 55439 -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/007_physical_counts.sql >/dev/null
+psql -h "$TEST_DIR" -p 55439 -d postgres -v ON_ERROR_STOP=1 -q -f scripts/test-physical-counts.sql
+python3 scripts/test-count-approval.py "$TEST_DIR" 55439

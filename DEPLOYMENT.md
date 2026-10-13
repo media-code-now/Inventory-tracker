@@ -10,7 +10,7 @@ Source and local permission/concurrency/realtime tests are ready. Supabase produ
 
 ## Production setup
 
-1. Create or choose the dedicated Supabase office project. Apply migrations 001–006 in order with `supabase db push` after linking the correct project, or through the SQL Editor. For an existing database, apply only unapplied migrations; never reset it. Migration 003 rejects conflicting legacy identifiers rather than rewriting them automatically. It also creates the private image bucket.
+1. Create or choose the dedicated Supabase office project. Apply migrations 001–007 in order with `supabase db push` after linking the correct project, or through the SQL Editor. For an existing database, apply only unapplied migrations; never reset it. Migration 003 rejects conflicting legacy identifiers rather than rewriting them automatically. It also creates the private image bucket.
 2. Disable public and anonymous signup in hosted Auth settings. Enable email confirmation, configure a minimum 12-character password and production SMTP, and set the Auth Site URL to the final private app origin. Allow the exact `/auth/accept-invite/` and `/auth/reset-password/` redirect URLs at that origin.
 3. Deploy `supabase/functions/invite-user` using the trusted owner's CLI. Set its `SITE_URL` secret to the final origin. Hosted Supabase supplies the service-role credential to the Edge Function; never place it in browser variables or frontend source.
 4. Create and verify the intended first admin in the Auth dashboard. Run `scripts/bootstrap-admin.sql` through a trusted owner's database connection, supplying their verified Auth UUID and name. There is no public first-admin endpoint. See the README for the exact command.
