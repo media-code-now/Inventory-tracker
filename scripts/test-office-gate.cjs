@@ -35,3 +35,10 @@ test('global rate limit survives client changes and fails closed on database out
  attempts=20;assert.equal((await login.POST(post('/api/office/login/',process.env.OFFICE_PASSWORD))).status,429);
  const original=global.fetch;global.fetch=async()=>{throw Error('Offline')};assert.equal((await middleware(authenticated('/inventory/','a'.repeat(64)))).status,503);global.fetch=original;
 });
+
+test('setup errors identify missing variables and migrations without exposing secrets',async()=>{
+ const key=process.env.SUPABASE_SERVICE_ROLE_KEY;delete process.env.SUPABASE_SERVICE_ROLE_KEY;attempts=0;
+ const missing=await login.POST(post('/api/office/login/','wrong'));assert.equal(missing.status,503);assert.ok((await missing.json()).error.includes('SUPABASE_SERVICE_ROLE_KEY'));process.env.SUPABASE_SERVICE_ROLE_KEY=key;
+ const original=global.fetch;global.fetch=async()=>new Response('sensitive upstream details',{status:404});
+ const absent=await login.POST(post('/api/office/login/','wrong'));const body=await absent.json();assert.equal(absent.status,503);assert.ok(body.error.includes('010_office_gate.sql'));assert.ok(!body.error.includes('sensitive'));global.fetch=original;
+});

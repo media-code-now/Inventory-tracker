@@ -1,5 +1,5 @@
 import {NextRequest,NextResponse} from 'next/server';
-import {cookieName,hash,newSession,officeRpc,passwordMatches,sameOrigin,sessionCookie,settings} from '../../../../lib/office-server';
+import {cookieName,hash,newSession,officeRpc,passwordMatches,sameOrigin,sessionCookie,settings,officeFailure} from '../../../../lib/office-server';
 export async function POST(request:NextRequest){
  try{
   if(!sameOrigin(request))return NextResponse.json({error:'Origin not allowed'},{status:403});
@@ -15,5 +15,5 @@ export async function POST(request:NextRequest){
   const response=NextResponse.json({ok:true});
   response.cookies.set(cookieName,await newSession(),sessionCookie(settings().ttl));
   return response;
- }catch{return NextResponse.json({error:'Office access is temporarily unavailable'},{status:503});}
+ }catch(error){return NextResponse.json({error:officeFailure(error)},{status:503});}
 }

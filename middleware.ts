@@ -1,5 +1,5 @@
 import {NextRequest,NextResponse} from 'next/server';
-import {settings,validSession} from './lib/office-server';
+import {settings,validSession,officeFailure} from './lib/office-server';
 export async function middleware(request:NextRequest){
  let response:NextResponse;
  try{
@@ -12,7 +12,7 @@ export async function middleware(request:NextRequest){
   if(!publicPath&&!await validSession(request)){
    response=path.startsWith('/api/')?NextResponse.json({error:'Office authorization required'},{status:401}):NextResponse.redirect(new URL('/office-unlock/?next='+encodeURIComponent(request.nextUrl.pathname+request.nextUrl.search),s.origin));
   }else response=NextResponse.next();
- }catch{response=new NextResponse('Office access is temporarily unavailable',{status:503});}
+ }catch(error){response=new NextResponse(officeFailure(error),{status:503});}
  response.headers.set('X-Robots-Tag','noindex, nofollow, noarchive');
  response.headers.set('Cache-Control','private, no-store');
  response.headers.set('Referrer-Policy','same-origin');
