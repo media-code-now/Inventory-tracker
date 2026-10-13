@@ -1,3 +1,5 @@
+> **Neon migration:** Inventory, permissions, office sessions and private files now use Neon PostgreSQL. Supabase is retained only for staff authentication and invitation email. Follow [NEON-SETUP.md](./NEON-SETUP.md); older Supabase database/Storage and static hosting instructions below are historical.
+
 # Office password protection
 
 The app now requires a running Next.js Node server. Static Sites / `out/` hosting cannot enforce this gate. Remove any older public static deployment and do not publish `out/` or `.next/server` as static files. Existing Supabase staff logins, invite-only enrollment, role permissions, and audit identities remain required after the office password.

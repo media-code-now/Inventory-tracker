@@ -21,4 +21,4 @@ if(key){
 }
 // Also prevent accidentally public-prefixed privileged variables from entering the build.
 if(Object.keys(process.env).some(name=>name.startsWith('NEXT_PUBLIC_')&&/SERVICE_ROLE|SECRET_KEY|DATABASE_URL/.test(name)))throw new Error('Remove privileged NEXT_PUBLIC_ configuration before building.');
-console.log(key?'Public Supabase configuration validated.':'Isolated demo mode: Supabase is not configured.');
+console.log(key?'Public Supabase configuration validated.':'Neon PostgreSQL backend; staff authentication is not configured.');

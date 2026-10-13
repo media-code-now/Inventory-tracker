@@ -22,9 +22,16 @@
     "test:operations": "node --test scripts/test-diagnostics-focus.cjs",
     "test:office": "node --test scripts/test-office-gate.cjs",
     "start": "next start",
-    "verify:office-http": "node scripts/verify-office-http.cjs"
+    "verify:office-http": "node scripts/verify-office-http.cjs",
+    "neon:migrate": "node scripts/neon-migrate.mjs",
+    "verify:neon": "node scripts/verify-neon.cjs",
+    "neon:bootstrap-admin": "node scripts/neon-bootstrap-admin.mjs",
+    "verify:neon-office": "node scripts/verify-neon-office.cjs"
   },
   "dependencies": {
+    "@neon/config": "^1.9.1",
+    "@neon/env": "^1.6.1",
+    "@neondatabase/serverless": "^1.2.0",
     "@supabase/supabase-js": "^2.57.0",
     "@tailwindcss/postcss": "^4.1.0",
     "lucide-react": "^0.468.0",

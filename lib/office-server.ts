@@ -1,3 +1,4 @@
+import {database} from './neon-db';
 import {createHash, createHmac, randomBytes, timingSafeEqual} from 'node:crypto';
 import type {NextRequest} from 'next/server';
 class OfficeConfigurationError extends Error {}
@@ -24,14 +25,18 @@ export function settings(){
  return {password,secret,origin:new URL(origin).origin,ttl,generation:createHmac('sha256',secret).update(password).digest('hex')};
 }
 export async function officeRpc(name:string,args:object){
- const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.SUPABASE_SERVICE_ROLE_KEY;
- if(!url)configurationError('Server setup required: NEXT_PUBLIC_SUPABASE_URL is missing.');
- if(!key)configurationError('Server setup required: SUPABASE_SERVICE_ROLE_KEY is missing.');
- const response=await fetch(`${url}/rest/v1/rpc/${name}`,{method:'POST',headers:{apikey:key,Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify(args),cache:'no-store',signal:AbortSignal.timeout(10000)});
- if(response.status===401)configurationError('Server setup required: Supabase rejected the service-role key. Check that the key and project URL belong to the same project.');
- if(response.status===404)configurationError('Server setup required: Office session database functions were not found. Apply migration 010_office_gate.sql to the configured Supabase project.');
- if(!response.ok)configurationError('Office session database request failed. Check the Supabase migration and service-role permissions.');
- return response.json();
+ if(!process.env.DATABASE_URL)configurationError('Server setup required: DATABASE_URL is missing. Run neon deploy and configure the server environment.');
+ const operations:Record<string,string[]>={office_session_valid:['p_hash','p_generation'],office_session_create:['p_hash','p_generation','p_seconds'],office_session_delete:['p_hash'],office_login_attempt:[]};
+ const keys=operations[name];if(!keys)throw Error('Unknown office operation');
+ try{
+  const parameters=args as Record<string,unknown>;
+  const rows=await database().query(`select public.${name}(${keys.map((key,i)=>`${key} => $${i+1}`).join(',')}) as result`,keys.map(key=>parameters[key]));
+  return rows[0].result;
+ }catch(error){
+  if((error as {code?:string}).code==='42883')configurationError('Server setup required: Neon office session functions are missing. Run npm run neon:migrate.');
+  if((error as {code?:string}).code==='28P01')configurationError('Server setup required: Neon rejected the database credentials. Refresh DATABASE_URL with neon deploy.');
+  throw error;
+ }
 }
 export const hash=(value:string)=>createHash('sha256').update(value).digest('hex');
 export function passwordMatches(value:string){return timingSafeEqual(Buffer.from(hash(value)),Buffer.from(hash(settings().password)));}
