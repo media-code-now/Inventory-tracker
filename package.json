@@ -17,7 +17,9 @@
     "release:check": "node scripts/release-check.mjs",
     "release:demo": "node scripts/release-check.mjs --demo",
     "test:dashboard": "node --test scripts/test-dashboard.cjs",
-    "test:csv": "node --test scripts/test-csv-reports.cjs"
+    "test:csv": "node --test scripts/test-csv-reports.cjs",
+    "verify:office": "node scripts/verify-office.cjs",
+    "test:operations": "node --test scripts/test-diagnostics-focus.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.0",

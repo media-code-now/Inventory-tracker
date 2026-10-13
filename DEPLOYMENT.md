@@ -4,13 +4,13 @@ The frontend is a Next.js static export in `out/`; authentication, PostgreSQL, S
 
 ## Current release state
 
-Source and local permission/concurrency/realtime tests are ready. Supabase production credentials, migrations, Auth/SMTP settings, and the first admin still need configuration. The existing hosted version is a clearly labeled demo. It is not a production office database.
+Source and local permission/concurrency/realtime tests are ready. Supabase production credentials, migrations, Auth/SMTP settings, and the first admin still need configuration. This is not production-ready until the gates in VERIFICATION.md pass. The existing hosted version is a clearly labeled demo. It is not a production office database.
 
 `npm run release:check` fails immediately when production configuration is missing or uses a privileged browser key. `npm run release:demo` explicitly builds a demo artifact for review. Both run type checks, access/filter/realtime tests, the actual migrations against temporary PostgreSQL, a production-dependency audit, route existence checks, and the build. Local PostgreSQL binaries and `rg` are required for the database tests; no production database is accessed by this check.
 
 ## Production setup
 
-1. Create or choose the dedicated Supabase office project. Apply migrations 001–008 in order with `supabase db push` after linking the correct project, or through the SQL Editor. For an existing database, apply only unapplied migrations; never reset it. Migration 003 rejects conflicting legacy identifiers rather than rewriting them automatically. It also creates the private image bucket.
+1. Create or choose the dedicated Supabase office project. Apply migrations 001–009 in order with `supabase db push` after linking the correct project, or through the SQL Editor. For an existing database, apply only unapplied migrations; never reset it. Migration 003 rejects conflicting legacy identifiers rather than rewriting them automatically. It also creates the private image bucket.
 2. Disable public and anonymous signup in hosted Auth settings. Enable email confirmation, configure a minimum 12-character password and production SMTP, and set the Auth Site URL to the final private app origin. Allow the exact `/auth/accept-invite/` and `/auth/reset-password/` redirect URLs at that origin.
 3. Deploy `supabase/functions/invite-user` using the trusted owner's CLI. Set its `SITE_URL` secret to the final origin. Hosted Supabase supplies the service-role credential to the Edge Function; never place it in browser variables or frontend source.
 4. Create and verify the intended first admin in the Auth dashboard. Run `scripts/bootstrap-admin.sql` through a trusted owner's database connection, supplying their verified Auth UUID and name. There is no public first-admin endpoint. See the README for the exact command.
@@ -42,3 +42,5 @@ Keep the previous known-good saved frontend version for rollback. Database migra
 Enable the project's database backup/recovery facilities through its owner account before storing operational office data. Retain the deployment archive and exact source commit used for each release.
 
 Migration 008 moves costs into `item_costs` with admin-only RLS; costs are absent from shared item/realtime records. Apply it before the new frontend. Old frontend versions expect costs on `items`, so rollback requires a compatible client. Imports are admin-only, transactional and immutable; use the downloadable templates and preview. Validate invitation-only Auth and live cost isolation in the configured Supabase project before office rollout.
+
+Migration 009 adds admin-readable, rate-limited structured diagnostics. Read [OPERATIONS.md](OPERATIONS.md) for onboarding, monitoring, backup/restore and the office-network boundary, and [VERIFICATION.md](VERIFICATION.md) for the release hold and evidence checklist. Hosted backup retention, monitoring destinations and network restrictions are not configured in this checkout.

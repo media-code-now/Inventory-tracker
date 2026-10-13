@@ -36,3 +36,7 @@ python3 scripts/test-count-approval.py "$TEST_DIR" 55439
 psql -h "$TEST_DIR" -p 55439 -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/008_csv_reports.sql >/dev/null
 psql -h "$TEST_DIR" -p 55439 -d postgres -v ON_ERROR_STOP=1 -q -f scripts/test-csv-import.sql
 python3 scripts/test-concurrent-imports.py "$TEST_DIR" 55439
+psql -h "$TEST_DIR" -p 55439 -d postgres -v ON_ERROR_STOP=1 -f supabase/migrations/009_operational_logging.sql >/dev/null
+psql -h "$TEST_DIR" -p 55439 -d postgres -v ON_ERROR_STOP=1 -q -f scripts/test-operational-logging.sql
+psql -h "$TEST_DIR" -p 55439 -d postgres -v ON_ERROR_STOP=1 -q -f scripts/operational-check.sql
+sh scripts/test-backup-restore.sh "$TEST_DIR" 55439

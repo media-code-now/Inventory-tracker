@@ -16,7 +16,10 @@ Deno.serve(async (request: Request) => {
     'Cache-Control': 'no-store',
     'Vary': 'Origin',
   };
-  const reply = (status: number, body: object) => new Response(JSON.stringify(body), {status, headers});
+  const reply = (status: number, body: object) => {
+    if(status>=500)console.error(JSON.stringify({event:'invitation_backend_failure',status}));
+    return new Response(JSON.stringify(body), {status, headers});
+  };
   if (request.headers.get('Origin') && request.headers.get('Origin') !== origin) return reply(403, {error:'Origin not allowed'});
   if (request.method === 'OPTIONS') return new Response(null, {status:204, headers});
   if (request.method !== 'POST') return reply(405, {error:'Method not allowed'});

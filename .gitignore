@@ -8,3 +8,6 @@ out/
 release/
 .supabase/
 supabase/.temp/
+backups/
+*.dump
+*.backup
