@@ -5,11 +5,11 @@ This app uses Neon PostgreSQL for inventory, memberships/permissions, immutable 
 ## Linked project
 
 - Organization: `org-dawn-mud-44689891`
-- Project: `winter-rice-28831472`
-- Branch: `production`
+- Project: `stockroom` (`purple-truth-70667458`)
+- Branch: `production` (`br-steep-bird-arjlkess`)
 - Config: `neon.ts` (Postgres only; Neon Auth is not enabled)
 
-`neon init -y --org-id org-dawn-mud-44689891 --project-id winter-rice-28831472 --branch production --services postgres` linked this directory. `neon deploy` verified the branch and pulled `DATABASE_URL`, `DATABASE_URL_UNPOOLED` and `NEON_BRANCH` into ignored `.env.local`. The production schema was installed after testing on the disposable `inventory-neon-migration` branch. Production starts empty; it has no sample inventory or synthetic staff.
+`neon init -y --org-id org-dawn-mud-44689891 --project-id purple-truth-70667458 --branch production --services postgres` linked this directory. `neon deploy` verified the branch and pulled `DATABASE_URL`, `DATABASE_URL_UNPOOLED` and `NEON_BRANCH` into ignored `.env.local`. The production schema was installed with `npm run neon:migrate` (11 migrations) after the full end-to-end suite passed on the disposable `inventory-neon-migration` branch. Production starts empty; it has no sample inventory or synthetic staff. (The project previously linked here, `winter-rice-28831472`, is no longer used.)
 
 ## Runtime and migrations
 
@@ -22,6 +22,15 @@ npm run neon:migrate
 ```
 
 `neon deploy` provisions services and pulls env; it does not apply SQL migrations. Test schema changes on a Neon child branch before applying them to production.
+
+### Pull-request preview branches
+
+`.github/workflows/neon-preview-branch.yml` creates a Neon branch `preview/pr-<number>-<git-branch>` from `production` for every opened/updated pull request, runs `npm run neon:migrate` against it using the branch's direct connection, posts a schema-diff comment to the PR, and deletes the branch when the PR closes (branches also auto-expire after 14 days). Configure in the GitHub repository:
+
+- Variable `NEON_PROJECT_ID`: `purple-truth-70667458`
+- Secret `NEON_API_KEY`: a Neon API key with access to the project
+
+Connection strings are passed only as step environment variables and are never logged. Preview branches contain a copy of production data at creation time; treat them with the same care as production.
 
 ## Staff accounts and first admin
 
