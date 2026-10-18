@@ -13,3 +13,7 @@ backups/
 *.backup
 .neon
 .admin-initial-password.txt
+
+# Local Netlify folder
+.netlify
+.office-password.txt
