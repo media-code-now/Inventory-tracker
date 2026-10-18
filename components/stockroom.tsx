@@ -3,6 +3,7 @@ import {useEffect,useState,useCallback, useRef, type FormEvent} from 'react';
 import Link from 'next/link';
 import {useFocusContainment} from '../lib/use-focus-containment';
 import {reportOperationalError} from '../lib/diagnostics';
+import {prepareImage,imageExtension} from '../lib/image-prep';
 import AuthScreen from './auth-screen';
 import ItemImage from './item-image';
 import ItemFields from './item-fields';
@@ -128,9 +129,17 @@ export default function Stockroom({initialPage}:{initialPage:string}){
     if(metadata.barcode&&items.some(i=>i.id!==id&&i.barcode===metadata.barcode))throw Error('This barcode is already reserved by an active or archived item.');
     try {
       if(file instanceof File&&file.size){
-        if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>5*1024*1024)throw Error('Choose a JPEG, PNG, or WebP image up to 5 MB.');
-        if(demo)imagePath=URL.createObjectURL(file);
-        else {const extension=file.type==='image/jpeg'?'jpg':file.type==='image/png'?'png':'webp';const path=`items/${id}/${crypto.randomUUID()}.${extension}`;const {error}=await supabase!.storage.from('item-images').upload(path,file,{contentType:file.type,upsert:false,cacheControl:'0'});if(error)throw error;uploadedPath=path;imagePath=path;}
+        if(demo){if(!['image/jpeg','image/png','image/webp'].includes(file.type))throw Error('Choose a JPEG, PNG, or WebP image.');imagePath=URL.createObjectURL(file);}
+        else {
+          const blob=await prepareImage(file);
+          const path=`items/${id}/${crypto.randomUUID()}.${imageExtension(blob.type)}`;
+          const upload=await Promise.race([
+            supabase!.storage.from('item-images').upload(path,blob,{contentType:blob.type,upsert:false,cacheControl:'0'}),
+            new Promise<never>((_,reject)=>setTimeout(()=>reject(Error('Image upload timed out. Check your connection and try again.')),45000)),
+          ]);
+          if(upload.error)throw Error(upload.error.message||'Image upload failed. Try a smaller image.');
+          uploadedPath=path;imagePath=path;
+        }
       }
       if(demo){
         if(editItem){const live=items.find(i=>i.id===id);if(!live||live.updated_at!==editItem.updated_at)throw Error('This item changed. Reopen it before saving.');setItems(prev=>prev.map(i=>i.id===id?{...i,...metadata,image_path:imagePath,updated_at:now}:i));}

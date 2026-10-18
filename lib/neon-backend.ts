@@ -26,11 +26,12 @@ export async function neonBackend(request:NextRequest,path:string[]){
     return new Response(request.method==='HEAD'?null:bytes,{headers:{'Content-Type':rows[0].content_type??'application/octet-stream','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
    }
    if(request.method==='POST'&&name){
-    if(Number(request.headers.get('content-length'))>6*1024*1024)throw new StaffAccessError('Maximum image size is 5 MB',413);
+    // Serverless hosts reject bodies around 4.5 MB before this code runs; the client downsizes photos to ≤3 MB.
+    if(Number(request.headers.get('content-length'))>4*1024*1024)throw new StaffAccessError('Image is too large to upload. Choose a smaller image.',413);
     let content:Buffer,type=request.headers.get('content-type')??'';
     if(type.startsWith('multipart/form-data')){const form=await request.formData();const file=Array.from(form.values()).find(value=>value instanceof Blob);if(!(file instanceof Blob))throw new StaffAccessError('Image required',400);type=file.type;content=Buffer.from(await file.arrayBuffer());}
     else content=Buffer.from(await request.arrayBuffer());
-    if(!['image/jpeg','image/png','image/webp'].includes(type)||content.length>5*1024*1024)throw new StaffAccessError('Choose a JPEG, PNG, or WebP image up to 5 MB',400);
+    if(!['image/jpeg','image/png','image/webp'].includes(type)||content.length>4*1024*1024)throw new StaffAccessError('Choose a JPEG, PNG, or WebP image up to 4 MB',400);
     const rows=await query("insert into storage.objects(bucket_id,name,content_type,bytes) values($1,$2,$3,decode($4,'base64')) returning id",[bucket,name,type,content.toString('base64')]);
     return Response.json({Id:rows[0].id,Key:bucket+'/'+name},{status:200});
    }

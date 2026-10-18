@@ -59,7 +59,7 @@ Keep `DATABASE_URL_UNPOOLED` in trusted migration/CLI settings; the web server d
 
 Office cookies remain `HttpOnly`, `Secure`, `SameSite=Strict`, with absolute expiry. Logout deletes the Neon session. Changing the password invalidates existing session generations; rotate the session secret when changing/restoring a password, and restart all replicas together. Trusted-owner SQL `delete from office_security.sessions` revokes every office session.
 
-Private images remain limited to JPEG/PNG/WebP, 5 MB each. Bytes and metadata are stored in Neon and served through authenticated handlers under the existing Storage RLS. No public or signed bearer URLs are returned. For large media workloads, a dedicated object store can be added later; none was provisioned for this Postgres-only setup.
+Private images remain limited to JPEG/PNG/WebP. The browser downsizes photos to ≤1280 px and ≤3 MB before upload (`lib/image-prep.ts`); the upload handler rejects bodies over 4 MB with a JSON error because Netlify Functions drop requests around 4.5 MB at the edge with an empty 413 that `supabase-js` cannot parse, which previously left the Save button spinning. Bytes and metadata are stored in Neon and served through authenticated handlers under the existing Storage RLS. No public or signed bearer URLs are returned. For large media workloads, a dedicated object store can be added later; none was provisioned for this Postgres-only setup.
 
 ## Verification
 
