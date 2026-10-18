@@ -1,6 +1,6 @@
 export type CsvRow=Record<string,string>;
 export type ImportKind='items'|'opening';
-export const importHeaders={items:['name','sku','barcode','category','description','unit','unit_cost','supplier','minimum','location'],opening:['sku','location','quantity','reason','notes']};
+export const importHeaders={items:['name','sku','barcode','category','unit','unit_cost','supplier','minimum','location'],opening:['sku','location','quantity','reason','notes']};
 export function encodeCsv(rows:(string|number|null|undefined)[][]){return rows.map(row=>row.map(value=>{let s=String(value??'');if(/^[\s\u0000-\u001f]*[=+@-]/.test(s)||/^[\t\r\n]/.test(s))s="'"+s;return '"'+s.replaceAll('"','""')+'"';}).join(',')).join('\r\n');}
 export function downloadCsv(filename:string,rows:(string|number|null|undefined)[][]){const url=URL.createObjectURL(new Blob(['\ufeff'+encodeCsv(rows)],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 // Quoted fields may contain commas, escaped quotes, and newlines. Never evaluate cells.
