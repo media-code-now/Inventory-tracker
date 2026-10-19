@@ -29,6 +29,7 @@ export default function Stockroom({initialPage}:{initialPage:string}){
  const [page,setPage]=useState(initialPage),[demo]=useState(demoEnabled),[items,setItems]=useState<Item[]>(demoEnabled?demoItems:[]),[locations,setLocations]=useState<Location[]>(demoEnabled?demoLocations:[]),[members,setMembers]=useState<Member[]>(demoEnabled?demoMembers:[]),[movements,setMovements]=useState<Movement[]>([]),[userId,setUserId]=useState<string|null>(null),[authReady,setAuthReady]=useState(!supabase),[search,setSearch]=useState(''),[category,setCategory]=useState('All categories'),[stockFilter,setStockFilter]=useState('All statuses'),[selected,setSelected]=useState<string>('1'),[modal,setModal]=useState<'item'|'movement'|'location'|'member'|'invite'|'archive'|'reversal'|null>(null),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(false),[mobile,setMobile]=useState(false),[connection,setConnection]=useState<LiveStatus>('Connecting'),[kindFilter,setKindFilter]=useState('All movements');
  const [counts,setCounts]=useState<StockCount[]>([]),[countLines,setCountLines]=useState<CountLine[]>([]),[countEntries,setCountEntries]=useState<CountEntry[]>([]);
  const [alerts,setAlerts]=useState<StockAlert[]>([]),[issuePeriod,setIssuePeriod]=useState(30);
+ const seenAlertsRef=useRef<Set<string>>(new Set()),alertsInitializedRef=useRef(false);
  const [editItem,setEditItem]=useState<Item|null>(null),[locationFilter,setLocationFilter]=useState('all'),[lifecycleFilter,setLifecycleFilter]=useState<'active'|'archived'|'all'>('active');
  const savingRef=useRef(false),requestRef=useRef<{id:string;payload:string}|null>(null);
  const [reverseMovement,setReverseMovement]=useState<Movement|null>(null),[pendingRequest,setPendingRequest]=useState<{id:string;args:Record<string,unknown>}|null>(null);
@@ -115,7 +116,21 @@ export default function Stockroom({initialPage}:{initialPage:string}){
  const filtered=filterInventory(items,balances,locations,{search,category,location:locationFilter,stock:stockFilter,lifecycle:lifecycleFilter}).sort((a,b)=>{const direction=sort.endsWith('desc')?-1:1;const result=sort.startsWith('quantity')?locationQuantity(a,balances,locationFilter)-locationQuantity(b,balances,locationFilter):sort.startsWith('sku')?a.sku.localeCompare(b.sku):a.name.localeCompare(b.name);return direction*(result||a.id.localeCompare(b.id));});
  const filteredMovements=movements.filter(m=>((items.find(i=>i.id===m.item_id)?.name??'')+' '+(members.find(u=>u.id===m.actor_id)?.name??'')+' '+(m.reason??m.note)+' '+(m.notes??'')+' '+(m.recipient??'')).toLowerCase().includes(search.toLowerCase())&&(kindFilter==='All movements'||m.kind===kindFilter));
  const current=items.find(i=>i.id===selected);
- function notify(message:string){setNotice(message);setTimeout(()=>setNotice(''),4500)}
+ const notify=useCallback((message:string)=>{setNotice(message);setTimeout(()=>setNotice(''),4500)},[]);
+ useEffect(()=>{
+  const currentIds=new Set(currentAlerts.map(a=>a.id));
+  if(!alertsInitializedRef.current){seenAlertsRef.current=currentIds;alertsInitializedRef.current=true;return;}
+  const opened=currentAlerts.filter(a=>!seenAlertsRef.current.has(a.id));
+  seenAlertsRef.current=currentIds;
+  if(!opened.length)return;
+  const outCount=opened.filter(a=>a.condition==='out_of_stock').length,lowCount=opened.length-outCount;
+  const first=opened[0],firstItem=items.find(i=>i.id===first.item_id),firstLabel=first.condition==='out_of_stock'?'out of stock':'low stock';
+  const message=opened.length===1?`${firstItem?.name??'An item'} is ${firstLabel}.`:`${opened.length} items need restock${outCount?` · ${outCount} out of stock`:''}${lowCount?` · ${lowCount} low stock`:''}.`;
+  notify(message);
+  if(typeof window!=='undefined'&&'Notification' in window&&window.Notification.permission==='granted'){
+   try{new Notification('Inventory alert',{body:message,tag:'inventory-low-stock'});}catch{}
+  }
+ },[currentAlerts,items,notify]);
  async function save(e:FormEvent<HTMLFormElement>){e.preventDefault();if(savingRef.current)return;savingRef.current=true;setBusy(true);setError('');const f=new FormData(e.currentTarget);const s=(k:string)=>String(f.get(k)??''),n=(k:string)=>Number(f.get(k));try{
   if(modal==='item'){
     if(!admin)throw Error('Admin access required.');
