@@ -1,8 +1,8 @@
 import {database} from './neon-db';
 import {createHash, createHmac, randomBytes, timingSafeEqual} from 'node:crypto';
 import type {NextRequest} from 'next/server';
-class OfficeConfigurationError extends Error {}
-function configurationError(message:string):never {throw new OfficeConfigurationError(message);}
+class OfficeConfigurationError extends Error {constructor(message:string,readonly code?:string){super(message);}}
+function configurationError(message:string,code?:string):never {throw new OfficeConfigurationError(message,code);}
 export function officeFailure(error:unknown){
  const message=error instanceof OfficeConfigurationError?error.message:'Office access is temporarily unavailable';
  // Only fixed messages are logged; never upstream responses, tokens, or environment values.
@@ -41,7 +41,7 @@ export async function officeRpc(name:string,args:object){
   const rows=await database().query(`select public.${name}(${keys.map((key,i)=>`${key} => $${i+1}`).join(',')}) as result`,keys.map(key=>parameters[key]));
   return rows[0].result;
  }catch(error){
-  if((error as {code?:string}).code==='42883')configurationError('Server setup required: Neon office session functions are missing. Run npm run neon:migrate.');
+  if((error as {code?:string}).code==='42883')configurationError('Server setup required: Neon office session functions are missing. Run npm run neon:migrate.','42883');
   if((error as {code?:string}).code==='28P01')configurationError('Server setup required: Neon rejected the database credentials. Refresh DATABASE_URL with neon deploy.');
   throw error;
  }
@@ -55,12 +55,21 @@ export async function validSession(request:NextRequest){
  if(!token)return false;
  return await officeRpc('office_session_valid',{p_hash:hash(token),p_generation:settings().generation})===true;
 }
+let revisionWarned=false;
 // Null when the office session is no longer valid.
 export async function inventoryRevision(request:NextRequest):Promise<string|null>{
  const token=request.cookies.get(cookieName)?.value;
  if(!token||!/^[a-f0-9]{64}$/.test(token))return null;
- const revision=await officeRpc('office_inventory_revision',{p_hash:hash(token),p_generation:settings().generation});
- return revision===null?null:String(revision);
+ try{
+  const revision=await officeRpc('office_inventory_revision',{p_hash:hash(token),p_generation:settings().generation});
+  return revision===null?null:String(revision);
+ }catch(error){
+  if(!(error instanceof OfficeConfigurationError&&error.code==='42883'))throw error;
+  // Migration 011 is not applied yet: validate the session the old way and report a new revision every tick,
+  // so the stream stays open and clients refresh on each tick as before.
+  if(!revisionWarned){revisionWarned=true;console.error(JSON.stringify({event:'inventory_revision_unavailable'}));}
+  return await validSession(request)?'unversioned-'+Date.now():null;
+ }
 }
 export function sameOrigin(request:NextRequest){return request.headers.get('origin')===settings().origin;}
 export async function newSession(){const token=randomBytes(32).toString('hex'),s=settings();await officeRpc('office_session_create',{p_hash:hash(token),p_generation:s.generation,p_seconds:s.ttl});return token;}

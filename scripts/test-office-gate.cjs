@@ -56,3 +56,14 @@ test('data requests reuse the verified identity briefly and rely on the database
  const rejected=await call(live);assert.equal(rejected.status,401);assert.equal((await rejected.json()).error,'Office authorization required');
  db.staffQuery=staffQuery;global.fetch=original.fetch;db.database=original.query;
 });
+test('update stream stays open and signals every tick before the revision migration is applied',async()=>{
+ attempts=0;const token=(await login.POST(post('/api/office/login/',process.env.OFFICE_PASSWORD))).headers.get('set-cookie').split(';')[0].split('=')[1];
+ const events=require('../app/api/office/events/route.ts');const original=db.database;
+ db.database=()=>{const sql=original();return {...sql,query:async(text,values)=>{if(text.includes('office_inventory_revision'))throw Object.assign(Error('function does not exist'),{code:'42883'});return sql.query(text,values);}};};
+ const error=console.error;console.error=()=>{};
+ try{
+  assert.equal((await events.GET(authenticated('/api/office/events/','b'.repeat(64)))).status,401);
+  const controller=new AbortController();const response=await events.GET(new NextRequest('https://office.example/api/office/events/',{headers:{cookie:`${security.cookieName}=${token}`},signal:controller.signal}));
+  assert.equal(response.status,200);controller.abort();
+ }finally{db.database=original;console.error=error;}
+});
