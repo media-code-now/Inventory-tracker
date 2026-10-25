@@ -2,8 +2,8 @@ const {readFileSync}=require('node:fs');const vm=require('node:vm');const assert
 const exportsObject={};vm.runInNewContext(ts.transpileModule(readFileSync('lib/live-inventory.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exportsObject,setTimeout,clearTimeout,setInterval,clearInterval});
 const {createLiveInventory,AccessDenied}=exportsObject;
 const wait=()=>new Promise(r=>setTimeout(r,30));
-function session(database){let online=true,listener=null,removed=0,fetches=0,slow=null,error=null;const snapshots=[],statuses=[],failures=[];
- const controller=createLiveInventory({online:()=>online,fetchSnapshot:async()=>{fetches++;if(slow)await slow;if(error)throw error;return structuredClone(database);},subscribe:(change,status)=>{listener={change,status};queueMicrotask(()=>status('SUBSCRIBED'));return()=>{removed++;listener=null;};},apply:data=>snapshots.push(data),status:s=>statuses.push(s),failure:(message,denied)=>failures.push({message,denied}),pollMs:100000,debounceMs:1});
+function session(database,pollMs=100000){let online=true,listener=null,removed=0,fetches=0,slow=null,error=null;const snapshots=[],statuses=[],failures=[];
+ const controller=createLiveInventory({online:()=>online,fetchSnapshot:async()=>{fetches++;if(slow)await slow;if(error)throw error;return structuredClone(database);},subscribe:(change,status)=>{listener={change,status};queueMicrotask(()=>status('SUBSCRIBED'));return()=>{removed++;listener=null;};},apply:data=>snapshots.push(data),status:s=>statuses.push(s),failure:(message,denied)=>failures.push({message,denied}),pollMs,debounceMs:1});
  return{controller,snapshots,statuses,failures,get removed(){return removed},get fetches(){return fetches},event(){listener?.change()},setError:e=>error=e,setSlow:p=>slow=p,offline(){online=false;controller.offline()},online(){online=true;controller.reconnect()},listener:()=>listener};}
 test('two authenticated-controller sessions receive confirmed balances, totals, and activity',async()=>{
  const db={quantity:4,balances:{a:4,b:0},movements:[]};const a=session(db),b=session(db);a.controller.start();b.controller.start();await wait();assert.ok(a.controller.canPost()&&b.controller.canPost());
@@ -25,4 +25,8 @@ test('access denied never starts a subscription; stopping prevents late route/se
 test('event bursts coalesce and a change during an in-flight fetch schedules a follow-up',async()=>{
  const db={quantity:1};const s=session(db);s.controller.start();await wait();const before=s.fetches;for(let n=0;n<10;n++)s.event();await wait();assert.equal(s.fetches,before+1);
  let release;s.setSlow(new Promise(r=>release=r));const r=s.controller.refresh();s.event();await wait();db.quantity=2;s.setSlow(null);release();await r;await wait();assert.equal(s.snapshots.at(-1).quantity,2);assert.ok(s.fetches>=before+3);s.controller.stop();
+});
+test('polling does not refetch while live, but retries after a failed refresh',async()=>{
+ const s=session({quantity:1},10);s.controller.start();await wait();const before=s.fetches;await wait();await wait();assert.equal(s.fetches,before);
+ s.setError(Error('Network failed'));await s.controller.refresh();s.setError(null);await wait();assert.ok(s.fetches>before+1);assert.equal(s.controller.canPost(),true);s.controller.stop();
 });

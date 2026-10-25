@@ -1,7 +1,8 @@
 export type LiveStatus='Connecting'|'Live'|'Reconnecting'|'Offline'|'Access denied'|'Disconnected';
 export class AccessDenied extends Error {}
 type Options<T>={fetchSnapshot:()=>Promise<T>;subscribe:(change:()=>void,status:(s:string)=>void)=>()=>void;apply:(snapshot:T)=>void;status:(state:LiveStatus)=>void;failure:(message:string,denied:boolean)=>void;online:()=>boolean;loading?:(value:boolean)=>void;pollMs?:number;debounceMs?:number};
-// A controller belongs to one authenticated route/session. Callbacks from removed channels are ignored.
+// A controller belongs to one authenticated route/session. While Live, change events drive refreshes; polling only recovers.
+// Callbacks from removed channels are ignored.
 export function createLiveInventory<T>(options:Options<T>){
  let stopped=false,subscribed=false,hasSnapshot=false,epoch=0,running:Promise<boolean>|null=null,dirty=false,remove:(()=>void)|null=null;
  let debounce:ReturnType<typeof setTimeout>|null=null,poll:ReturnType<typeof setInterval>|null=null;
@@ -45,7 +46,7 @@ export function createLiveInventory<T>(options:Options<T>){
   void fetchCurrent();
  }
  return {
-  start(){connect();poll=setInterval(()=>{if(!stopped&&options.online()){if(!remove||(!subscribed&&state==='Reconnecting'))connect();else void fetchCurrent()}},options.pollMs??15000);},
+  start(){connect();poll=setInterval(()=>{if(!stopped&&options.online()){if(!remove||(!subscribed&&state==='Reconnecting'))connect();else if(state!=='Live')void fetchCurrent()}},options.pollMs??15000);},
   refresh:fetchCurrent,
   reconnect(){connect();},
   offline(){epoch++;subscribed=false;remove?.();remove=null;setStatus('Offline');},

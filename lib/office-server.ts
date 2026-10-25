@@ -10,7 +10,15 @@ export function officeFailure(error:unknown){
  return message;
 }
 export const cookieName='__Host-office-session';
-export function settings(){
+type OfficeSettings={password:string;secret:string;origin:string;ttl:number;generation:string};
+let cachedSettings:{key:string;value:OfficeSettings}|null=null;
+// Validated once per configuration; the environment is still read on each call so changes take effect.
+export function settings():OfficeSettings{
+ const key=JSON.stringify([process.env.OFFICE_PASSWORD,process.env.OFFICE_SESSION_SECRET,process.env.OFFICE_APP_ORIGIN,process.env.OFFICE_SESSION_TTL_SECONDS,process.env.NODE_ENV]);
+ if(cachedSettings?.key===key)return cachedSettings.value;
+ const value=loadSettings();cachedSettings={key,value};return value;
+}
+function loadSettings():OfficeSettings{
  const password=process.env.OFFICE_PASSWORD, secret=process.env.OFFICE_SESSION_SECRET;
  const origin=process.env.OFFICE_APP_ORIGIN;
  const ttl=Number(process.env.OFFICE_SESSION_TTL_SECONDS??28800);
@@ -26,7 +34,7 @@ export function settings(){
 }
 export async function officeRpc(name:string,args:object){
  if(!process.env.DATABASE_URL)configurationError('Server setup required: DATABASE_URL is missing. Run neon deploy and configure the server environment.');
- const operations:Record<string,string[]>={office_session_valid:['p_hash','p_generation'],office_session_create:['p_hash','p_generation','p_seconds'],office_session_delete:['p_hash'],office_login_attempt:[]};
+ const operations:Record<string,string[]>={office_session_valid:['p_hash','p_generation'],office_inventory_revision:['p_hash','p_generation'],office_session_create:['p_hash','p_generation','p_seconds'],office_session_delete:['p_hash'],office_login_attempt:[]};
  const keys=operations[name];if(!keys)throw Error('Unknown office operation');
  try{
   const parameters=args as Record<string,unknown>;
@@ -40,10 +48,19 @@ export async function officeRpc(name:string,args:object){
 }
 export const hash=(value:string)=>createHash('sha256').update(value).digest('hex');
 export function passwordMatches(value:string){return timingSafeEqual(Buffer.from(hash(value)),Buffer.from(hash(settings().password)));}
+// Format-only check, no database round trip.
+export function sessionToken(request:NextRequest){const token=request.cookies.get(cookieName)?.value;return token&&/^[a-f0-9]{64}$/.test(token)?token:null;}
 export async function validSession(request:NextRequest){
- const token=request.cookies.get(cookieName)?.value;
- if(!token||!/^[a-f0-9]{64}$/.test(token))return false;
+ const token=sessionToken(request);
+ if(!token)return false;
  return await officeRpc('office_session_valid',{p_hash:hash(token),p_generation:settings().generation})===true;
+}
+// Null when the office session is no longer valid.
+export async function inventoryRevision(request:NextRequest):Promise<string|null>{
+ const token=request.cookies.get(cookieName)?.value;
+ if(!token||!/^[a-f0-9]{64}$/.test(token))return null;
+ const revision=await officeRpc('office_inventory_revision',{p_hash:hash(token),p_generation:settings().generation});
+ return revision===null?null:String(revision);
 }
 export function sameOrigin(request:NextRequest){return request.headers.get('origin')===settings().origin;}
 export async function newSession(){const token=randomBytes(32).toString('hex'),s=settings();await officeRpc('office_session_create',{p_hash:hash(token),p_generation:s.generation,p_seconds:s.ttl});return token;}

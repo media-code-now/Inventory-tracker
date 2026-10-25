@@ -60,6 +60,8 @@ export async function neonBackend(request:NextRequest,path:string[]){
  }catch(error){
   const databaseError=error as {code?:string;message?:string;detail?:string};
   if(error instanceof StaffAccessError)return Response.json({error:error.message},{status:error.status});
+  // The database's office gate rejected the session; same response as the route-level check so the client returns to the unlock screen.
+  if(databaseError.code==='42501'&&databaseError.message==='Office authorization required')return Response.json({error:'Office authorization required'},{status:401});
   if(databaseError.code){
    const status=databaseError.code==='42501'?403:['23505','40001'].includes(databaseError.code)?409:400;
    // Database validation messages are structured, never connection strings or SQL text.

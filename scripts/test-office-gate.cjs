@@ -41,3 +41,18 @@ test('missing Neon environment is reported without exposing secrets; SQL names a
  const response=await login.POST(post('/api/office/login/','wrong'));assert.equal(response.status,503);assert.ok((await response.json()).error.includes('DATABASE_URL'));process.env.DATABASE_URL=url;
  assert.throws(()=>db.rpcStatement('office_session_create',{}));assert.throws(()=>db.rpcStatement('create_item',{'p_id);drop table members;--':'x'}));
 });
+test('data requests reuse the verified identity briefly and rely on the database office gate',async()=>{
+ attempts=0;const token=(await login.POST(post('/api/office/login/',process.env.OFFICE_PASSWORD))).headers.get('set-cookie').split(';')[0].split('=')[1];
+ const jwt=exp=>'h.'+Buffer.from(JSON.stringify({exp})).toString('base64url')+'.s';
+ const original={fetch:global.fetch,query:db.database},seen={fetches:0,sessionChecks:0};
+ global.fetch=async(input,init)=>{seen.fetches++;return original.fetch(input,init);};
+ db.database=()=>{const sql=original.query();return {...sql,query:async(text,values)=>{if(text.includes('office_session_valid'))seen.sessionChecks++;return sql.query(text,values);}};};
+ const call=bearer=>backend.POST(req('/api/backend/rest/v1/rpc/inventory_snapshot',{method:'POST',headers:{origin:'https://office.example',cookie:`${security.cookieName}=${token}`,authorization:'Bearer '+bearer,'content-type':'application/json'},body:'{}'}),{params:Promise.resolve({path:['rest','v1','rpc','inventory_snapshot']})});
+ const live=jwt(Math.floor(Date.now()/1000)+3600);
+ for(let n=0;n<3;n++)assert.equal((await call(live)).status,200);
+ assert.equal(seen.fetches,1);assert.equal(seen.sessionChecks,0);
+ const expired=jwt(Math.floor(Date.now()/1000)-10);await call(expired);await call(expired);assert.equal(seen.fetches,3);
+ const staffQuery=db.staffQuery;db.staffQuery=async()=>{throw Object.assign(Error('Office authorization required'),{code:'42501'});};
+ const rejected=await call(live);assert.equal(rejected.status,401);assert.equal((await rejected.json()).error,'Office authorization required');
+ db.staffQuery=staffQuery;global.fetch=original.fetch;db.database=original.query;
+});

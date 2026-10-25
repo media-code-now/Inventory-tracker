@@ -1,13 +1,15 @@
 import {neonBackend} from '../../../../lib/neon-backend';
 import {NextRequest} from 'next/server';
-import {validSession,sameOrigin} from '../../../../lib/office-server';
+import {validSession,sameOrigin,sessionToken} from '../../../../lib/office-server';
 async function proxy(request:NextRequest,{params}:{params:Promise<{path:string[]}>}){
  try{
-  if(!await validSession(request))return Response.json({error:'Office authorization required'},{status:401});
+  if(!sessionToken(request))return Response.json({error:'Office authorization required'},{status:401});
   if(!['GET','HEAD'].includes(request.method)&&!sameOrigin(request))return Response.json({error:'Origin not allowed'},{status:403});
   const {path}=await params;
   if(!['auth','rest','storage','functions'].includes(path[0])||path[1]!=='v1'||path.some(p=>p==='.'||p==='..'||p.includes('/')||p.includes('\\'))||path.includes('admin'))return new Response('Not found',{status:404});
+  // Inventory and file queries recheck the office session inside their own database transaction (office_gate_pre_request).
   if(path[0]!=='auth')return neonBackend(request,path);
+  if(!await validSession(request))return Response.json({error:'Office authorization required'},{status:401});
   // Staff Auth is the only remaining upstream service. Inventory and files use Neon.
   const target=new URL('/'+path.map(encodeURIComponent).join('/')+request.nextUrl.search,process.env.NEXT_PUBLIC_SUPABASE_URL);
   const headers=new Headers();
