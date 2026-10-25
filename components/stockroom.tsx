@@ -26,7 +26,7 @@ function Badge({item,quantity}:{item:Item;quantity?:number}){const s=quantity===
 function money(n:number){return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(n)}
 export default function Stockroom({initialPage}:{initialPage:string}){
  const demoEnabled=!supabase&&process.env.NEXT_PUBLIC_INVENTORY_BACKEND!=='neon';
- const [page,setPage]=useState(initialPage),[demo]=useState(demoEnabled),[items,setItems]=useState<Item[]>(demoEnabled?demoItems:[]),[locations,setLocations]=useState<Location[]>(demoEnabled?demoLocations:[]),[members,setMembers]=useState<Member[]>(demoEnabled?demoMembers:[]),[movements,setMovements]=useState<Movement[]>([]),[userId,setUserId]=useState<string|null>(null),[authReady,setAuthReady]=useState(!supabase),[search,setSearch]=useState(''),[category,setCategory]=useState('All categories'),[stockFilter,setStockFilter]=useState('All statuses'),[selected,setSelected]=useState<string>('1'),[modal,setModal]=useState<'bulk-item'|'item'|'movement'|'location'|'member'|'invite'|'archive'|'reversal'|null>(null),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(false),[mobile,setMobile]=useState(false),[connection,setConnection]=useState<LiveStatus>('Connecting'),[kindFilter,setKindFilter]=useState('All movements');
+ const [page,setPage]=useState(initialPage),[demo]=useState(demoEnabled),[items,setItems]=useState<Item[]>(demoEnabled?demoItems:[]),[locations,setLocations]=useState<Location[]>(demoEnabled?demoLocations:[]),[members,setMembers]=useState<Member[]>(demoEnabled?demoMembers:[]),[movements,setMovements]=useState<Movement[]>([]),[userId,setUserId]=useState<string|null>(null),[authReady,setAuthReady]=useState(!supabase),[search,setSearch]=useState(''),[category,setCategory]=useState('All categories'),[stockFilter,setStockFilter]=useState('All statuses'),[selected,setSelected]=useState<string>('1'),[modal,setModal]=useState<'bulk-item'|'item'|'movement'|'location'|'member'|'invite'|'archive'|'reversal'|null>(null),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(false),[mobile,setMobile]=useState(false),[liveStatus,setConnection]=useState<LiveStatus>('Connecting'),[connection,setShownConnection]=useState<LiveStatus>('Connecting'),[kindFilter,setKindFilter]=useState('All movements');
  const [counts,setCounts]=useState<StockCount[]>([]),[countLines,setCountLines]=useState<CountLine[]>([]),[countEntries,setCountEntries]=useState<CountEntry[]>([]);
  const [alerts,setAlerts]=useState<StockAlert[]>([]),[issuePeriod,setIssuePeriod]=useState(30);
  // Snapshots carry only the newest movements; full history is fetched for pages that need it and kept current by merging.
@@ -50,6 +50,12 @@ export default function Stockroom({initialPage}:{initialPage:string}){
  const canWrite=!!me?.active&&(me.role==='admin'||me.role==='staff'),admin=!!me?.active&&me.role==='admin';
  const clearData=useCallback(()=>{setItems([]);setLocations([]);setMembers([]);setMovements([]);setBalances([]);setInvitations([]);setCheckedItems([]);setBulkItems([]);setBulkFields([]);setModal(null);setEditMember(null);setEditItem(null);setAlerts([]);setCounts([]);setCountLines([]);setCountEntries([]);setHistory(null);setMovementsComplete(true);setIssued(null);setLastRefreshed(null)},[]);
  const refresh=useCallback(async()=>{await liveRef.current?.refresh()},[]);
+ const pageRef=useRef(page);pageRef.current=page;
+ // Brief stream reopens are not shown: only a drop lasting over 3 s shows Reconnecting. Posting still requires canPost() and a confirming refresh.
+ useEffect(()=>{
+  if(liveStatus==='Live'||liveStatus==='Offline'||liveStatus==='Access denied'){setShownConnection(liveStatus);return;}
+  const timer=setTimeout(()=>setShownConnection(liveStatus),3000);return()=>clearTimeout(timer);
+ },[liveStatus]);
  useEffect(()=>{
   const isOnline=()=>setOnline(navigator.onLine);isOnline();
   const offline=()=>{setOnline(false);liveRef.current?.offline()};
@@ -72,7 +78,7 @@ export default function Stockroom({initialPage}:{initialPage:string}){
    online:()=>navigator.onLine,
    fetchSnapshot:async()=>{
     const {data,error,status}=await client.rpc('inventory_snapshot');
-    if(error){if(status===401||status===403||error.code==='42501')throw new AccessDenied('Your session no longer has office access.');reportOperationalError('snapshot_failed',page);throw new Error('Unable to confirm current stock. Reconnect and refresh before posting.');}
+    if(error){if(status===401||status===403||error.code==='42501')throw new AccessDenied('Your session no longer has office access.');reportOperationalError('snapshot_failed',pageRef.current);throw new Error('Unable to confirm current stock. Reconnect and refresh before posting.');}
     if(!data)throw new AccessDenied('Your account is not an active office member.');
     const snapshot=data as {items:Item[];balances:Balance[];locations:Location[];members:Member[];movements:Movement[];movements_complete?:boolean;issued?:Record<string,IssuedRow[]>;invitations:Invitation[];alerts:StockAlert[];counts:StockCount[];count_lines:CountLine[];count_entries:CountEntry[];confirmed_at:string};
     if(!snapshot.members.some(m=>m.id===userId&&m.active))throw new AccessDenied('Office membership is inactive.');
@@ -98,7 +104,7 @@ export default function Stockroom({initialPage}:{initialPage:string}){
   liveRef.current=controller;controller.start();
   const recover=()=>{if(navigator.onLine)void controller.refresh()};window.addEventListener('focus',recover);
   return()=>{cancelled=true;controller.stop();if(liveRef.current===controller)liveRef.current=null;window.removeEventListener('focus',recover)};
- },[userId,demo,page,clearData]);
+ },[userId,demo,clearData]);
  async function logout(){if(!supabase)return;liveRef.current?.stop();liveRef.current=null;clearData();setAccess('checking');const {error}=await supabase.auth.signOut({scope:'global'});if(error){await supabase.auth.signOut({scope:'local'});}const officeLogout=await fetch('/api/office/logout/',{method:'POST'});if(!officeLogout.ok){setError('Unable to end office session. Use Lock office / log out to retry.');return;}window.location.assign('/office-unlock/');}
  useEffect(()=>{const id=new URLSearchParams(window.location.search).get('id');if(id)setSelected(id)},[]);
  const sidebarRef=useRef<HTMLElement>(null);
