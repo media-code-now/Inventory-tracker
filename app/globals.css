@@ -51,3 +51,5 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 .quick-edit-context{font-size:13px;color:var(--muted);margin:-8px 0 22px;line-height:1.6}
 
 .bulk-edit-toolbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:0 22px 18px;font-size:13px;color:var(--muted)}.bulk-edit-field{margin-bottom:18px}.bulk-edit-field .checkbox-field{margin-bottom:9px!important}.bulk-edit-field input:disabled{opacity:.45;background:#edf0f5}.inventory-table input[type=checkbox]{width:20px;height:20px;accent-color:var(--green);cursor:pointer}
+
+.quick-qty{display:flex;gap:6px}.quick-qty button{display:inline-grid;place-items:center;width:30px;height:30px;padding:0;border:1px solid var(--line);border-radius:50%;background:#fff;color:var(--ink);cursor:pointer}.quick-qty button:hover:not(:disabled){border-color:var(--green);color:var(--green)}.quick-qty button:disabled{opacity:.35;cursor:not-allowed}
