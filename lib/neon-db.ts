@@ -5,7 +5,7 @@ export class StaffAccessError extends Error {constructor(message:string,readonly
 const connect=(url:string)=>neon(url,{fetchOptions:{cache:'no-store'}});
 let client:{url:string;sql:ReturnType<typeof connect>}|null=null;
 export function database(){const url=process.env.DATABASE_URL;if(!url)throw Error('DATABASE_URL is required');if(client?.url!==url)client={url,sql:connect(url)};return client.sql;}
-const allowedRpc=new Set(['inventory_snapshot','movement_history','office_role','record_application_error','accept_invitation','prepare_invitation','revoke_invitation','create_item','update_item','set_item_archived','set_member','post_movement','create_stock_count','start_stock_count','save_counted_quantity','refresh_count_snapshot','submit_stock_count','approve_stock_count','validate_inventory_import','commit_inventory_import']);
+const allowedRpc=new Set(['inventory_snapshot','movement_history','audit_history','office_role','record_application_error','accept_invitation','prepare_invitation','revoke_invitation','create_item','update_item','set_item_archived','set_member','post_movement','create_stock_count','start_stock_count','save_counted_quantity','refresh_count_snapshot','submit_stock_count','approve_stock_count','validate_inventory_import','commit_inventory_import']);
 export function rpcStatement(name:string,args:Record<string,unknown>){
  if(!allowedRpc.has(name))throw new StaffAccessError('Unknown inventory operation',404);
  const entries=Object.entries(args);
